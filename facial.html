@@ -68,6 +68,7 @@
     height: 100%;
     object-fit: cover;
     display: block;
+    transform: scaleX(-1);
   }
   #canvas {
     display: none;
@@ -281,19 +282,25 @@
 
   async function loadFaceDetectionModels() {
     try {
-      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js/dist/models/';
+      status.textContent = 'Cargando modelos...';
+      
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
       ]);
+      
       modelsLoaded = true;
       checklist.style.display = 'grid';
       status.textContent = 'Ajusta tu posición...';
       startFaceDetection();
     } catch (e) {
       console.error('Error loading models:', e);
-      status.textContent = 'Error cargando modelos.';
+      status.textContent = 'Reiniciando... intenta recargar la página';
+      setTimeout(() => {
+        loadFaceDetectionModels();
+      }, 3000);
     }
   }
 
@@ -333,7 +340,9 @@
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0);
+    // Invertir horizontalmente como la cámara
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -video.videoWidth, 0);
     return new Promise(resolve => {
       canvas.toBlob(resolve, 'image/jpeg', 0.95);
     });
